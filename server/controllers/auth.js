@@ -1,0 +1,134 @@
+const prisma = require("../config/prisma");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+
+exports.register = async (req, res) => {
+  try {
+    const {
+      firstName,
+      lastName,
+      departmentId,
+      positionId,
+      email,
+      userName,
+      password,
+      role,
+    } = req.body;
+
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [{ email: email }, { userName: userName }],
+      },
+    });
+
+    if (user) {
+      let message = "";
+
+      if (user.email === email && user.userName === userName) {
+        message = "Email and Username already exist.";
+      } else if (user.email === email) {
+        message = "Email already exists.";
+      } else if (user.userName === userName) {
+        message = "Username already exists.";
+      }
+
+      return res.status(400).json({
+        message: message,
+      });
+    }
+
+    const hashPassword = await bcrypt.hash(password, 10);
+
+    const authUser = await prisma.user.create({
+      data: {
+        firstName: firstName,
+        lastName: lastName,
+        departmentId: departmentId,
+        positionId: positionId,
+        email: email,
+        userName: userName,
+        password: hashPassword,
+        role: role,
+      },
+    });
+
+    res.json({
+      authUser,
+      message: "Created user successfully",
+    });
+  } catch (error) {
+    console.log(error);
+  }
+};
+
+exports.login = async (req, res) => {
+  try {
+    const { userName, password } = req.body;
+
+    const user = await prisma.user.findFirst({
+      where: {
+        userName: userName,
+      },
+    });
+    console.log(user.firstName)
+    if (!user || !user.enabled) {
+      return res.status(400).json({
+        message: "User Not Found or not Enabled",
+      });
+    }
+
+    const isMatch = await bcrypt.compare(password,user.password)
+    if(!isMatch){
+      return res.status(400).json({
+        message: "Password Invalid",
+      });
+    }
+
+    const payload = {
+      id:user.id,
+      name:user.firstName,
+      username:user.userName,
+      role: user.role
+    }
+    
+    jwt.sign(payload,process.env.SECRET,{expiresIn: '7d'},(error,token) => {
+      if(error){
+          return res.status(500).json({
+              message: "Server Error"
+          })
+      }
+      res.json({ 
+        payload, 
+        token ,
+        message: "Login Successfully"
+       })
+  })
+
+  } catch (error) {
+    console.log(error);
+  }
+};
+
+exports.currentUser = async(req,res)=> {
+  try {
+    const { userName } = req.body
+    console.log(userName)
+      const user = await prisma.user.findFirst({
+          where:{
+              userName: userName
+          },
+          select:{
+              id:true,
+              email:true,
+              firstName: true,
+              role: true
+          }
+      })
+      res.json({user})
+  } catch (error) {
+      console.log(error)
+      res.status(500).json({
+          message: "Server Error"
+      })
+  }
+}
