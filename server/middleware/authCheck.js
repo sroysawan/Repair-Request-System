@@ -33,7 +33,7 @@ exports.authCheck = async (req, res, next) => {
     //   }
     console.log("decode", decode);
 // ตรวจสอบ user ในฐานข้อมูล
-    const user = await prisma.user.findFirst({
+    const user = await prisma.user.findUnique({
       where: {
         userName: req.user.username,
       },
@@ -63,6 +63,7 @@ exports.authCheck = async (req, res, next) => {
 };
 
 
+//check มีสิทธิ์หรือเปล่า
 exports.roleCheck = (roles) => {
   return (req, res, next) => {
     try {
@@ -84,3 +85,29 @@ exports.roleCheck = (roles) => {
     }
   };
 };
+
+exports.checkUserExists = async (req, res, next) => {
+  try {
+    const id = req.params.id || req.body.id;
+
+    if (!id) {
+      return res.status(400).json({ message: "User ID is required" });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: Number(id) },
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    console.log("user", user);
+    req.checkUser = user;
+    next();
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server Error" });
+  }
+};
+
