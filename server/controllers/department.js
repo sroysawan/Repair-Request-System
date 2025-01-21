@@ -27,11 +27,22 @@ exports.listDepartment = async (req, res) => {
 
     let department;
     if (role === "ADMIN") {
-      department = await prisma.department.findMany();
+      department = await prisma.department.findMany({
+        include: {
+          _count: {
+            select: { user: true },
+          },
+        },
+      });
     } else if (role === "SUPERVISOR") {
       department = await prisma.department.findMany({
         where: {
           name: "IT Support",
+        },
+        include: {
+          _count: {
+            select: { user: true },
+          },
         },
       });
     } else {
@@ -39,7 +50,12 @@ exports.listDepartment = async (req, res) => {
         message: "Access Denied: Unauthorized role",
       });
     }
-    res.send(department);
+
+    const count = await prisma.department.count()
+    res.json({
+      totalDepartments: count,
+      department
+    })
   } catch (error) {
     console.log(error);
   }
@@ -49,6 +65,18 @@ exports.updateDepartment = async (req, res) => {
   try {
     const { id } = req.params;
     const { name } = req.body;
+
+    const checkDepartment = await prisma.department.findUnique({
+      where: {
+        id: Number(id)
+      }
+    })
+
+    if(!checkDepartment){
+      return res.status(404).json({
+        message: "Department Not found"
+      })
+    }
 
     const department = await prisma.department.update({
       where: {
@@ -71,6 +99,18 @@ exports.updateDepartment = async (req, res) => {
 exports.deleteDepartment = async (req, res) => {
   try {
     const { id } = req.params;
+
+    const checkDepartment = await prisma.department.findUnique({
+      where: {
+        id: Number(id)
+      }
+    })
+
+    if(!checkDepartment){
+      return res.status(404).json({
+        message: "Department Not found"
+      })
+    }
 
     const department = await prisma.department.delete({
       where: {
