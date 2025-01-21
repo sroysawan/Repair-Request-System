@@ -36,7 +36,12 @@ exports.listPosition = async (req, res) => {
         message: "Access Denied: Unauthorized role",
       });
     }
-    res.send(position);
+
+    const count = await prisma.position.count();
+    res.json({
+      totalPositions: count,
+      position,
+    });
   } catch (error) {
     console.log(first);
   }
@@ -46,6 +51,18 @@ exports.updatePosition = async (req, res) => {
   try {
     const { id } = req.params;
     const { name } = req.body;
+
+    const checkPosition = await prisma.position.findUnique({
+      where: {
+        id: Number(id),
+      },
+    });
+
+    if (!checkPosition) {
+      return res.status(404).json({
+        message: "Position Not found",
+      });
+    }
 
     const position = await prisma.position.update({
       where: {
@@ -68,6 +85,18 @@ exports.updatePosition = async (req, res) => {
 exports.deletePosition = async (req, res) => {
   try {
     const { id } = req.params;
+
+    const checkPosition = await prisma.position.findUnique({
+      where: {
+        id: Number(id),
+      },
+    });
+
+    if (!checkPosition) {
+      return res.status(404).json({
+        message: "Position Not found",
+      });
+    }
 
     const position = await prisma.position.delete({
       where: {
