@@ -14,23 +14,26 @@ datasource db {
 }
 
 model User {
-  id           Int          @id @default(autoincrement())
-  firstName    String
-  lastName     String
-  department   Department   @relation(fields: [departmentId], references: [id])
-  departmentId Int
-  position     Position     @relation(fields: [positionId], references: [id])
-  positionId   Int
-  email        String       @unique
-  userName     String       @unique
-  password     String
-  picture      Image?       @relation(fields: [pictureId], references: [id])
-  pictureId    Int?
-  role         Role
-  enabled      Boolean      @default(true)
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
-  Assignment   Assignment[]
+  id            Int             @id @default(autoincrement())
+  firstName     String
+  lastName      String
+  department    Department      @relation(fields: [departmentId], references: [id])
+  departmentId  Int
+  position      Position        @relation(fields: [positionId], references: [id])
+  positionId    Int
+  email         String          @unique
+  userName      String          @unique
+  password      String
+  picture       Image?          @relation(fields: [pictureId], references: [id])
+  pictureId     Int?
+  role          Role
+  enabled       Boolean         @default(true)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  assignment    Assignment[]
+  reportRepair  ReportRepair[]
+  repairHistory RepairHistory[] @relation("ReporterUser") // สำหรับผู้แจ้ง
+  repairHistoryTechnician RepairHistory[] @relation("TechnicianUser") // สำหรับช่าง
 }
 
 model Department {
@@ -50,15 +53,15 @@ model Position {
 }
 
 model Image {
-  id             Int          @id @default(autoincrement())
+  id             Int           @id @default(autoincrement())
   asset_id       String
   public_id      String
   url            String
   secure_url     String
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
   user           User[]
-  equipment      Equipment    @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  equipment      Equipment     @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
   equipmentId    Int
   reportRepair   ReportRepair? @relation(fields: [reportRepairId], references: [id], onDelete: Cascade)
   reportRepairId Int?
@@ -75,6 +78,7 @@ model Equipment {
   images              Image[]
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
+  reportRepairs       ReportRepair[]  
 }
 
 model EquipmentCategory {
@@ -83,39 +87,57 @@ model EquipmentCategory {
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
   equipment    Equipment[]
-  reportRepair ReportRepair[]
 }
 
 model ReportRepair {
   id                  Int                @id @default(autoincrement())
-  name                String
-  equipmentNumber     String?
-  equipmentCategory   EquipmentCategory? @relation(fields: [equipmentCategoryId], references: [id])
-  equipmentCategoryId Int?
-  problem             String?
+  name                String // หัวข้อปัญหา
+  equipment           Equipment          @relation(fields: [equipmentId], references: [id]) // เชื่อมโยงกับ Equipment
+  equipmentId         Int                // คอลัมน์อ้างอิง Equipment
+  problem             String? // รายละเอียดปัญหา
   address             String?
   images              Image[]
+  reporterBy          User               @relation(fields: [reporterByUserId], references: [id])
+  reporterByUserId    Int // ผู้แจ้ง (พนักงาน)
   assignmentStatus    AssignmentStatus   @default(PENDING)
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
-  Assignment          Assignment[]
+  assignment          Assignment[]
+  repairHistory       RepairHistory[]
 }
 
 model Assignment {
   id             Int              @id @default(autoincrement())
   reportRepair   ReportRepair     @relation(fields: [reportRepairId], references: [id])
-  reportRepairId Int
+  reportRepairId Int // งานแจ้งซ่อมที่เกี่ยวข้อง
   technician     User             @relation(fields: [technicianId], references: [id])
-  technicianId   Int
-  assignedAt     DateTime         @default(now())
-  startedAt      DateTime?
-  finishedAt     DateTime?
+  technicianId   Int // ช่างที่รับผิดชอบ
   status         AssignmentStatus
-  solution       String?
+  assignedAt     DateTime         @default(now()) // วันที่เวลาที่มอบหมายงาน
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
 }
 
+model RepairHistory {
+  id             Int          @id @default(autoincrement())
+  reportRepair   ReportRepair @relation(fields: [reportRepairId], references: [id])
+  reportRepairId Int // อ้างอิงงานแจ้งซ่อม
+
+  // ข้อมูลที่สำเนามาจาก ReportRepair
+  title          String // หัวข้อปัญหา
+  description    String // รายละเอียดปัญหา
+  reporterUser   User     @relation("ReporterUser", fields: [reporterUserId], references: [id])
+  reporterUserId Int  // ผู้แจ้ง
+  // ข้อมูล Assignment
+  technician     User     @relation("TechnicianUser", fields: [technicianId], references: [id])
+  technicianId   Int // ช่างที่รับผิดชอบ
+  status         String // สถานะ (COMPLETED, CANCELLED)
+  solution       String? // สิ่งที่แก้ไขไป
+  assignedAt     DateTime
+  finishedAt     DateTime?  @default(now())
+  createdAt      DateTime @default(now())
+   updatedAt      DateTime         @updatedAt
+}
 enum Role {
   ADMIN
   SUPERVISOR
