@@ -87,7 +87,7 @@ exports.readUser = async (req, res) => {
 
 exports.updateUser = async (req, res) => {
   try {
-    const { firstName, lastName, departmentId, positionId, email, userName ,pictureId } =
+    const { firstName, lastName, departmentId, positionId, tel, email, userName ,pictureId } =
       req.body;
 
     const checkEmailUsername = await prisma.user.findFirst({
@@ -132,6 +132,7 @@ exports.updateUser = async (req, res) => {
         lastName: lastName,
         departmentId: departmentId,
         positionId: positionId,
+        tel:tel,
         email: email,
         userName: userName,
         pictureId: pictureId
