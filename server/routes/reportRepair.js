@@ -6,10 +6,10 @@ const router = express.Router()
 router.post('/report-repair',authCheck,create)
 
 //ประวัติการแจ้งซ่อมทั้งหมด
-router.get('/report-repair/history/all',listReportRepair)
+router.get('/report-repair/history/all',authCheck,listReportRepair)
 
 //ประวัติการแจ้งซ่อม by id
-router.get('/report-repair/history/by-id/:id',readReportRepair)
+router.get('/report-repair/history/by-id/:id',authCheck,readReportRepair)
 
 //ประวัติการแจ้งซ่อมทั้งหมดของ User
 router.get('/report-repair/history/by-user',authCheck,listReportRepairByUser)
