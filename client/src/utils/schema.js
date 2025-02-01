@@ -53,9 +53,26 @@ export const departmentSchema = z.object({
 
 });
 
-export const equipmentCategorySchema = z.object({
+export const categorySchema = z.object({
   name: z
   .string()
   .nonempty("กรุณากรอกตำแหน่ง")
   .min(2, "ชื่อตำแหน่งต้องมากกว่า 2 ตัวอักษร"),
 });
+
+export const equipmentSchema = z.object({
+  equipmentCategoryId: z.coerce.number(),
+  name: z
+    .string()
+    .nonempty("กรุณากรอกชื่ออุปกรณ์")
+    .min(2, "ชื่ออุปกรณ์ต้องมากกว่า 2 ตัวอักษร"),
+  equipmentNumber: z
+    .string()
+    .nonempty("กรุณากรอกรหัสอุปกรณ์")
+    .min(2, "รหัสอุปกรณ์ต้องมากกว่า 2 ตัวอักษร"),
+  address: z
+    .string()
+    .nonempty("กรุณากรอกสถานที่")
+    .min(2, "สถานที่ต้องมากกว่า 2 ตัวอักษร"),
+  statusEquipment: z.string().nonempty("กรุณาเลือกสถานะของอุปกรณ์")
+})
