@@ -9,6 +9,7 @@ exports.register = async (req, res) => {
       lastName,
       departmentId,
       positionId,
+      tel,
       email,
       userName,
       password,
@@ -60,6 +61,7 @@ exports.register = async (req, res) => {
         lastName: lastName,
         departmentId: departmentId,
         positionId: positionId,
+        tel:tel,
         email: email,
         userName: userName,
         password: hashPassword,
@@ -85,7 +87,17 @@ exports.login = async (req, res) => {
       where: {
         userName: userName,
       },
+      select: {
+        id: true,
+        firstName: true,
+        userName: true,
+        role: true,
+        password: true,
+        enabled: true,
+        departmentId: true, // ดึงเฉพาะ departmentId
+      },
     });
+    console.log(user)
 
     if (!user || !user.enabled) {
       return res.status(400).json({
@@ -105,6 +117,7 @@ exports.login = async (req, res) => {
       name: user.firstName,
       username: user.userName,
       role: user.role,
+      departmentId: user.departmentId, 
     };
 
     jwt.sign(
