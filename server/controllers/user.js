@@ -18,13 +18,17 @@ exports.listUser = async (req, res) => {
           position: true,
           role: true,
           enabled: true,
+          createdAt:true,
         },
+        orderBy:{
+          createdAt:"desc"
+        }
       });
     } else if (role === "SUPERVISOR") {
       // Technician Lead: ดูเฉพาะผู้ใช้ที่เป็น "ช่าง"
       users = await prisma.user.findMany({
         where: {
-          role: "TECHNICIAN", // เงื่อนไข: แสดงเฉพาะช่าง
+          role: { in: ["TECHNICIAN", "SUPERVISOR"] }, // ดึง TECHNICIAN และ SUPERVISOR
         },
         select: {
           id: true,
@@ -35,6 +39,10 @@ exports.listUser = async (req, res) => {
           position: true,
           role: true,
           enabled: true,
+          createdAt:true,
+        },
+        orderBy: {
+          createdAt: "desc",
         },
       });
     } else {
@@ -74,7 +82,7 @@ exports.readUser = async (req, res) => {
 
     if(!user) {
       return res.status(404).json({
-        message: "No equipment not found"
+        message: "User not foun"
       })
     }
     res.send(user);
