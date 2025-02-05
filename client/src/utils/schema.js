@@ -37,27 +37,25 @@ export const registerSchema = z.object({
   role: z.string().nonempty("กรุณาเลือกสิทธิ์"),
 });
 
-
 export const positionSchema = z.object({
   name: z
-  .string()
-  .nonempty("กรุณากรอกตำแหน่ง")
-  .min(2, "ชื่อตำแหน่งต้องมากกว่า 2 ตัวอักษร"),
+    .string()
+    .nonempty("กรุณากรอกตำแหน่ง")
+    .min(2, "ชื่อตำแหน่งต้องมากกว่า 2 ตัวอักษร"),
 });
 
 export const departmentSchema = z.object({
   name: z
-  .string()
-  .nonempty("กรุณากรอกตำแหน่ง")
-  .min(2, "ชื่อตำแหน่งต้องมากกว่า 2 ตัวอักษร"),
-
+    .string()
+    .nonempty("กรุณากรอกตำแหน่ง")
+    .min(2, "ชื่อตำแหน่งต้องมากกว่า 2 ตัวอักษร"),
 });
 
 export const categorySchema = z.object({
   name: z
-  .string()
-  .nonempty("กรุณากรอกตำแหน่ง")
-  .min(2, "ชื่อตำแหน่งต้องมากกว่า 2 ตัวอักษร"),
+    .string()
+    .nonempty("กรุณากรอกตำแหน่ง")
+    .min(2, "ชื่อตำแหน่งต้องมากกว่า 2 ตัวอักษร"),
 });
 
 export const equipmentSchema = z.object({
@@ -74,5 +72,21 @@ export const equipmentSchema = z.object({
     .string()
     .nonempty("กรุณากรอกสถานที่")
     .min(2, "สถานที่ต้องมากกว่า 2 ตัวอักษร"),
-  statusEquipment: z.string().nonempty("กรุณาเลือกสถานะของอุปกรณ์")
-})
+  statusEquipment: z.string().nonempty("กรุณาเลือกสถานะของอุปกรณ์"),
+});
+
+export const reportSchema = z.object({
+  name: z
+    .string()
+    .nonempty("กรุณากรอกชื่ออุปกรณ์")
+    .min(2, "ชื่ออุปกรณ์ต้องมากกว่า 2 ตัวอักษร"),
+  equipmentId: z.coerce.number(),
+  problem: z
+    .string()
+    .nonempty("กรุณากรอกอาการ")
+    .min(2, "อาการต้องมากกว่า 2 ตัวอักษร"),
+  address: z
+    .string()
+    .nonempty("กรุณากรอกสถานที่")
+    .min(2, "สถานที่ต้องมากกว่า 2 ตัวอักษร"),
+});
