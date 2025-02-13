@@ -38,7 +38,6 @@ const Sidebar = () => {
   };
 
   const links = getLinksByRole();
-  console.log(links);
 
   return (
     // <nav className="w-72 border">
@@ -62,7 +61,7 @@ const Sidebar = () => {
       >
         <List>
           <div className="flex items-center p-4 gap-4">
-            <Profile />
+            <Profile image={user.picture} width={56} height={56}/>
             <div className="text-lg font-semibold">
               <p>คุณ {user.name}</p>
               <p className="text-xs font-light flex items-center gap-2">
