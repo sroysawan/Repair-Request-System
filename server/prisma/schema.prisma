@@ -73,8 +73,8 @@ model Equipment {
   name                String
   equipmentNumber     String?
   address             String?
-  equipmentCategory   EquipmentCategory? @relation(fields: [equipmentCategoryId], references: [id])
-  equipmentCategoryId Int?
+  equipmentCategory   EquipmentCategory @relation(fields: [equipmentCategoryId], references: [id])
+  equipmentCategoryId Int
   statusEquipment     StatusEquipment
   images              Image[]
   createdAt           DateTime           @default(now())
