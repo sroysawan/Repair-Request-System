@@ -1,5 +1,5 @@
 const express = require("express");
-const { listUser, updateUser, readUser, changeStatusUser, changeRole, changePassword } = require("../controllers/user");
+const { listUser, updateUser, readUser, changeStatusUser, changeRole, changePassword, listSupervisorandTechnician } = require("../controllers/user");
 const { authCheck, roleCheck, checkUserExists } = require("../middleware/authCheck");
 const router = express.Router();
 
@@ -9,6 +9,7 @@ router.get(
   roleCheck(["ADMIN", "SUPERVISOR"]), // ตรวจสอบบทบาทที่อนุญาต(ระบุว่าบทบาทไหนบ้างที่มีสิทธิ์เข้าถึง)
   listUser // Controller ที่จัดการข้อมูล
 );
+router.get('/users/supervisors-technicians',authCheck,listSupervisorandTechnician)
 
 router.get('/user/:id',authCheck,roleCheck(["ADMIN", "SUPERVISOR"]),readUser)
 router.put('/user/:id',authCheck,roleCheck(["ADMIN", "SUPERVISOR"]),checkUserExists,updateUser)
