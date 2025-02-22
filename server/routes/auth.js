@@ -8,6 +8,6 @@ router.post('/register',authCheck,roleCheck(['ADMIN', 'SUPERVISOR']),register)
 
 router.post('/login',login)
 
-router.post('/current-user',currentUser)
+router.get('/current-user',authCheck,currentUser)
 
 module.exports = router
