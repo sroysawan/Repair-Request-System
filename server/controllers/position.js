@@ -3,6 +3,7 @@ const prisma = require("../config/prisma");
 exports.create = async (req, res) => {
   try {
     const { name } = req.body;
+
     const position = await prisma.position.create({
       data: {
         name: name,
@@ -19,23 +20,24 @@ exports.create = async (req, res) => {
 
 exports.listPosition = async (req, res) => {
   try {
-    const { role } = req.user;
-    let position;
-    if (role === "ADMIN") {
-      position = await prisma.position.findMany();
-    } else if (role === "SUPERVISOR") {
-      position = await prisma.position.findMany({
-        where: {
-          name: {
-            in: ["หัวหน้าช่าง", "ช่าง"], // กรองตามชื่อภาษาไทย
-          },
-        },
-      });
-    } else {
-      return res.status(403).json({
-        message: "Access Denied: Unauthorized role",
-      });
+    const { query } = req.query;
+
+    let whereCondition = {};
+
+    if (query) {
+      whereCondition = {
+        OR: [{ name: { contains: query } }],
+      };
     }
+    const position = await prisma.position.findMany({
+      where: whereCondition,
+
+      include: {
+        _count: {
+          select: { user: true },
+        },
+      },
+    });
 
     const count = await prisma.position.count();
     res.json({
@@ -44,6 +46,22 @@ exports.listPosition = async (req, res) => {
     });
   } catch (error) {
     console.log(first);
+  }
+};
+
+exports.readPosition = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const position = await prisma.position.findFirst({
+      where: {
+        id: Number(id),
+      },
+    });
+    res.json({
+      position,
+    });
+  } catch (error) {
+    console.log(error);
   }
 };
 
@@ -96,6 +114,17 @@ exports.deletePosition = async (req, res) => {
       return res.status(404).json({
         message: "Position Not found",
       });
+    }
+
+    // 🔎 ตรวจสอบว่ามี user ใช้ position นี้อยู่ไหม
+    const positionUsers = await prisma.user.findMany({
+      where: { positionId: Number(id) }, // ✅ ตรวจสอบผู้ใช้ที่มีตำแหน่งนี้จริงๆ
+    });
+
+    if (positionUsers.length > 0) {
+      return res
+        .status(400)
+        .json({ message: "ไม่สามารถลบได้ มีผู้ใช้ในตำแหน่งนี้อยู่!" });
     }
 
     const position = await prisma.position.delete({
