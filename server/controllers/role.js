@@ -6,9 +6,17 @@ exports.listRoles = async (req, res) => {
     let roles;
 
     if (role === "ADMIN") {
-      roles = ["ADMIN", "SUPERVISOR", "TECHNICIAN", "USER"]; // Admin เห็นทั้งหมด
+      roles = [
+        { id: "ADMIN", name: "ผู้ดูแลระบบ" },
+        { id: "SUPERVISOR", name: "หัวหน้างาน" },
+        { id: "TECHNICIAN", name: "ช่างเทคนิค" },
+        { id: "USER", name: "ผู้ใช้งานทั่วไป" },
+      ];
     } else if (role === "SUPERVISOR") {
-      roles = ["SUPERVISOR", "TECHNICIAN"]; // Supervisor เห็นแค่บาง role
+      roles = [
+        { id: "SUPERVISOR", name: "หัวหน้างาน" },
+        { id: "TECHNICIAN", name: "ช่างเทคนิค" },
+      ];
     } else {
       return res.status(403).json({
         message: "Access Denied: Unauthorized role",
