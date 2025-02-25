@@ -1,6 +1,6 @@
 const express = require('express')
 const { authCheck, roleCheck } = require('../middleware/authCheck')
-const { create, listReportRepair, readReportRepair, listReportRepairByUser, listReportRepairByTechnician, listReportRepairNews } = require('../controllers/reportRepair')
+const { create, listReportRepair, listReportRepairByUser, listReportRepairByTechnician, listReportRepairNews, readReportRepair } = require('../controllers/reportRepair')
 const router = express.Router()
 
 router.post('/report-repair',authCheck,create)
