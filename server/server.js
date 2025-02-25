@@ -16,6 +16,6 @@ readdirSync('./routes').map((r)=>{
 })
 // console.log(readdirSync('./routes'))
 
-app.listen(5000, () => {
+app.listen(5004, () => {
   console.log("Server on port 5000");
 });
