@@ -20,7 +20,7 @@ exports.create = async (req, res) => {
 
 exports.listPosition = async (req, res) => {
   try {
-    const { query } = req.query;
+    const { query, page = 1, limit = 5 } = req.query;
 
     let whereCondition = {};
 
@@ -29,6 +29,10 @@ exports.listPosition = async (req, res) => {
         OR: [{ name: { contains: query } }],
       };
     }
+
+    const take = parseInt(limit); // จำนวนที่ต้องการดึง
+    const skip = (parseInt(page) - 1) * take; // คำนวณ offset
+
     const position = await prisma.position.findMany({
       where: whereCondition,
 
@@ -37,12 +41,18 @@ exports.listPosition = async (req, res) => {
           select: { user: true },
         },
       },
+      take, // ✅ ใช้ Prisma pagination
+      skip,
     });
 
-    const count = await prisma.position.count();
+    const count = await prisma.position.count(
+      {where: whereCondition }
+    );
     res.json({
       totalPositions: count,
       position,
+      totalPages: Math.ceil(count / take), // จำนวนหน้าทั้งหมด
+      currentPage: parseInt(page),
     });
   } catch (error) {
     console.log(first);
