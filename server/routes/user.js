@@ -11,8 +11,8 @@ router.get(
 );
 router.get('/users/supervisors-technicians',authCheck,listSupervisorandTechnician)
 
-router.get('/user/:id',authCheck,roleCheck(["ADMIN", "SUPERVISOR"]),readUser)
-router.put('/user/:id',authCheck,roleCheck(["ADMIN", "SUPERVISOR"]),checkUserExists,updateUser)
+router.get('/user/:id',authCheck,roleCheck(["ADMIN", "SUPERVISOR","TECHNICIAN","USER"]),readUser)
+router.put('/user/:id',authCheck,roleCheck(["ADMIN", "SUPERVISOR","TECHNICIAN","USER"]),checkUserExists,updateUser)
 
 // delete
 
@@ -20,7 +20,7 @@ router.patch('/user/change-status',authCheck,roleCheck(["ADMIN", "SUPERVISOR"]),
 router.patch('/user/change-role',authCheck,roleCheck(["ADMIN", "SUPERVISOR"]),checkUserExists,changeRole)
 router.patch('/user/change-password/:id'
   ,authCheck // ตรวจสอบ token ว่าใช้งานได้และผู้ใช้ล็อกอินหรือยัง
-  ,roleCheck(["ADMIN", "SUPERVISOR"]) // ตรวจสอบสิทธิ์ผู้ใช้ว่าเป็น ADMIN หรือ SUPERVISOR
+  ,roleCheck(["ADMIN", "SUPERVISOR","TECHNICIAN","USER"]) // ตรวจสอบสิทธิ์ผู้ใช้ว่าเป็น ADMIN หรือ SUPERVISOR
 ,checkUserExists // ตรวจสอบว่าผู้ใช้ (id) ที่จะเปลี่ยนรหัสผ่านมีอยู่จริงในฐานข้อมูล
 ,changePassword)  // ดำเนินการเปลี่ยนรหัสผ่าน
 
