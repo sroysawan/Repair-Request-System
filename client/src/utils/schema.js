@@ -73,7 +73,10 @@ export const equipmentSchema = z.object({
     .string()
     .nonempty("กรุณากรอกสถานที่")
     .min(2, "สถานที่ต้องมากกว่า 2 ตัวอักษร"),
-  statusEquipment: z.string().nonempty("กรุณาเลือกสถานะของอุปกรณ์"),
+  statusEquipment: z
+    .string()
+    .optional() // ✅ ทำให้เลือกได้ว่าจะส่งมาหรือไม่
+    .or(z.literal("")), // ✅ อนุญาตให้เป็นค่าว่าง
   images: z.any(),
 });
 
@@ -108,11 +111,10 @@ export const successAssignmentSchemaByTechnician = z.object({
 
 export const passwordSchema = z.object({
   password: z
-  .string()
-  .nonempty("กรุณากรอกรหัสผ่าน") // ห้ามเว้นว่าง
-  .min(8, "รหัสผ่านต้องมีความยาวอย่างน้อย 8 ตัวอักษร"),
-})
-
+    .string()
+    .nonempty("กรุณากรอกรหัสผ่าน") // ห้ามเว้นว่าง
+    .min(8, "รหัสผ่านต้องมีความยาวอย่างน้อย 8 ตัวอักษร"),
+});
 
 export const updateUserSchema = z.object({
   firstName: z
@@ -139,5 +141,34 @@ export const updateUserSchema = z.object({
     ),
   departmentId: z.coerce.number(),
   positionId: z.coerce.number(),
+  pictureId: z.any(),
+});
+
+export const updateUserAccountSchema = z.object({
+  firstName: z
+    .string()
+    .nonempty("กรุณากรอกชื่อ")
+    .min(2, "ชื่อต้องมากกว่า 2 ตัวอักษร"),
+  lastName: z
+    .string()
+    .nonempty("กรุณากรอกนามสกุล")
+    .min(2, "นามสกุลต้องมากกว่า 2 ตัวอักษร"),
+  email: z.string().nonempty("กรุณากรอกอีเมล").email("รูปแบบอีเมลไม่ถูกต้อง"),
+  tel: z
+    .string()
+    .nonempty("กรุณากรอกเบอร์โทร")
+    .regex(/^[0-9+()-\s]+$/, "กรุณากรอกเบอร์โทรให้ถูกต้อง")
+    .min(10, "เบอร์โทรต้องมีความยาว 10 ตัว")
+    .max(10, "เบอร์โทรต้องมีความยาวไม่เกิน 10 ตัว"),
+
+  userName: z
+    .string()
+    .nonempty("กรุณากรอก Username") // ห้ามเว้นว่าง
+    .min(3, "Username ต้องมีความยาวอย่างน้อย 3 ตัวอักษร")
+    .max(20, "Username ต้องไม่เกิน 20 ตัวอักษร")
+    .regex(
+      /^[a-zA-Z0-9_.]+$/,
+      "Username อนุญาตเฉพาะตัวอักษร, ตัวเลข, _ และ . เท่านั้น"
+    ),
   pictureId: z.any(),
 });
