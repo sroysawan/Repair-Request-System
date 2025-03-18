@@ -41,7 +41,7 @@ exports.listPosition = async (req, res) => {
           select: { user: true },
         },
       },
-      take, // ✅ ใช้ Prisma pagination
+      take, 
       skip,
     });
 
