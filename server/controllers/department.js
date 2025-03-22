@@ -23,27 +23,48 @@ exports.create = async (req, res) => {
 
 exports.listDepartment = async (req, res) => {
   try {
-    const { role } = req.user;
+    const { role,department } = req.user;
+    const departmentId = department?.id;
+    const { query, page = 1, limit = 5 } = req.query;
 
-    let department;
+
+    let whereCondition = {};
+
+    if (query) {
+      whereCondition = {
+        OR: [{ name: { contains: query } }],
+      };
+    }
+
+    const take = parseInt(limit); // จำนวนที่ต้องการดึง
+    const skip = (parseInt(page) - 1) * take; // คำนวณ offset
+
+
+    let departments;
     if (role === "ADMIN") {
-      department = await prisma.department.findMany({
+      departments = await prisma.department.findMany({
+        where: whereCondition,
         include: {
           _count: {
             select: { user: true },
           },
         },
+        take, // ✅ ใช้ Prisma pagination
+        skip,
       });
     } else if (role === "SUPERVISOR") {
-      department = await prisma.department.findMany({
+      departments = await prisma.department.findMany({
         where: {
-          name: "IT Support",
+          ...whereCondition,
+          id: departmentId, // กรองด้วย departmentId
         },
         include: {
           _count: {
             select: { user: true },
           },
         },
+        take, // ✅ ใช้ Prisma pagination
+        skip,
       });
     } else {
       return res.status(403).json({
@@ -51,15 +72,33 @@ exports.listDepartment = async (req, res) => {
       });
     }
 
-    const count = await prisma.department.count()
+    const count = await prisma.department.count({where: whereCondition })
     res.json({
       totalDepartments: count,
-      department
+      departments,
+      totalPages: Math.ceil(count / take), // จำนวนหน้าทั้งหมด
+      currentPage: parseInt(page),
     })
   } catch (error) {
     console.log(error);
   }
 };
+
+exports.readDepartment=async(req,res)=>{
+  try {
+    const { id } = req.params
+    const department = await prisma.department.findFirst({
+      where: {
+        id: Number(id)
+      }
+    })
+    res.json({
+      department
+    })
+  } catch (error) {
+    console.log(error)
+  }
+}
 
 exports.updateDepartment = async (req, res) => {
   try {
@@ -110,6 +149,15 @@ exports.deleteDepartment = async (req, res) => {
       return res.status(404).json({
         message: "Department Not found"
       })
+    }
+
+     // 🔎 ตรวจสอบว่ามี user ใช้ department นี้อยู่ไหม
+     const departmentUsers = await prisma.user.findMany({
+      where: { departmentId: Number(id) },
+    });
+
+    if (departmentUsers.length > 0) {
+      return res.status(400).json({ message: "ไม่สามารถลบได้ มีผู้ใช้ในแผนกนี้อยู่!" });
     }
 
     const department = await prisma.department.delete({
