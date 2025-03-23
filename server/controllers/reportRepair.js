@@ -74,8 +74,32 @@ exports.listReportRepair = async (req, res) => {
 
 exports.listReportRepairNews = async (req, res) => {
   try {
+    const { query, page = 1, limit = 5 } = req.query;
+    let whereCondition = {};
+
+    
+    if (query) {
+      whereCondition = {
+        OR: [
+          { equipment: { name: { contains: query } } },
+          { equipment: { equipmentNumber: { contains: query } } },
+          { equipment:
+            { equipmentCategory:
+               { name: { contains: query } } 
+           } 
+         },
+         { name: { contains: query } },
+         { address: { contains: query } },
+        ],
+      };
+    }
+
+    const take = parseInt(limit); // จำนวนที่ต้องการดึง
+    const skip = (parseInt(page) - 1) * take; // คำนวณ offset
+
     const reports = await prisma.reportRepair.findMany({
       where: {
+        ...whereCondition,
         assignmentStatus: "PENDING",
       },
       include: {
@@ -87,21 +111,33 @@ exports.listReportRepairNews = async (req, res) => {
             userName: true,
           },
         },
-        equipment: true,
+        equipment: {
+          include: {
+            equipmentCategory: true,
+          },
+        },
         images: true,
       },
       orderBy: {
         createdAt: "desc",
       },
+      take, // ✅ ใช้ Prisma pagination
+      skip,
     });
     const count = await prisma.reportRepair.count({
       where: {
+        ...whereCondition,
         assignmentStatus: "PENDING",
       },
     });
+
+
     res.json({
       totalReport: count,
       reports,
+      totalPages: Math.ceil(count / take), // จำนวนหน้าทั้งหมด
+      currentPage: parseInt(page),
+
     });
   } catch (error) {
     console.log(error);
@@ -170,16 +206,69 @@ exports.readReportRepair = async (req, res) => {
 exports.listReportRepairByUser = async (req, res) => {
   try {
     const { id } = req.user;
+    const { query, page = 1, limit = 5 } = req.query;
+
     if (!id) {
       return res.status(400).json({ message: "User is not authenticated" });
     }
 
+    let whereCondition = {};
+    if (query) {
+      whereCondition = {
+        OR: [
+          { equipment: { name: { contains: query } } },
+          { equipment: { equipmentNumber: { contains: query } } },
+          { equipment: { equipmentCategory: { name: { contains: query } } } },
+          { name: { contains: query } },
+          { address: { contains: query } },
+          { problem: { contains: query } },
+    
+          // ✅ ค้นหาชื่อช่างจาก assignment
+          {
+            assignment: {
+              some: {
+                technician: {
+                  OR: [
+                    { firstName: { contains: query } },
+                    { lastName: { contains: query } },
+                  ],
+                },
+              },
+            },
+          },
+    
+          // ✅ ค้นหาชื่อช่างจาก repairHistory
+          {
+            repairHistory: {
+              some: {
+                technician: {
+                  OR: [
+                    { firstName: { contains: query } },
+                    { lastName: { contains: query } },
+                  ],
+                },
+              },
+            },
+          },
+        ],
+      };
+    }
+    
+    const take = parseInt(limit); // จำนวนที่ต้องการดึง
+    const skip = (parseInt(page) - 1) * take; // คำนวณ offset
+
+
     const reports = await prisma.reportRepair.findMany({
       where: {
+        ...whereCondition,
         reporterByUserId: Number(id),
       },
       include: {
-        equipment: true,
+        equipment: {
+          include: {
+            equipmentCategory: true,
+          },
+        },
         images: true,
         assignment: {
           include: {
@@ -195,6 +284,8 @@ exports.listReportRepairByUser = async (req, res) => {
       orderBy: {
         createdAt: "desc",
       },
+      take, // ✅ ใช้ Prisma pagination
+      skip,
     });
 
     // ✅ **ดึงชื่อช่างมาแสดง ถ้ามีช่างใน assignment ให้ใช้ assignment ถ้าไม่มีให้ใช้ repairHistory**
@@ -212,6 +303,44 @@ exports.listReportRepairByUser = async (req, res) => {
           : "-",
     }));
 
-    res.send(report);
-  } catch (error) {}
+    const count = await prisma.reportRepair.count({
+      where: {
+        ...whereCondition,
+        reporterByUserId: Number(id),
+      },
+    });
+
+    const countReport = await prisma.reportRepair.count({
+      where: {
+        reporterByUserId: Number(id),
+        assignmentStatus: "PENDING",
+      },
+    });
+    const countReportProgress = await prisma.reportRepair.count({
+      where: {
+        reporterByUserId: Number(id),
+        assignmentStatus: "IN_PROGRESS",
+      },
+    });
+    const countReportComp = await prisma.reportRepair.count({
+      where: {
+        reporterByUserId: Number(id),
+        assignmentStatus: {
+          in: ["COMPLETED", "CANCELLED"],
+        },
+      },
+    });
+
+    res.json({
+      report,
+      totalReport: count,
+      totalPages: Math.ceil(count / take), // จำนวนหน้าทั้งหมด
+      currentPage: parseInt(page),
+      countReport,
+      countReportProgress,
+      countReportComp
+    });
+  } catch (error) {
+    console.log(error)
+  }
 };
