@@ -1,5 +1,6 @@
 const prisma = require("../config/prisma");
 
+//supervisor จ่ายงานให้ช่างเอง
 exports.assignRepairJob = async (req, res) => {
   try {
     const { technicianId, reportRepairId } = req.body;
@@ -13,6 +14,7 @@ exports.assignRepairJob = async (req, res) => {
     // ตรวจสอบว่ามีงานแจ้งซ่อมอยู่จริงหรือไม่
     const reportRepair = await prisma.reportRepair.findUnique({
       where: { id: Number(reportRepairId) },
+      select: { equipmentId: true }, // ดึง equipmentId มาด้วย
     });
 
     if (!reportRepair) {
@@ -50,6 +52,12 @@ exports.assignRepairJob = async (req, res) => {
         data: { assignmentStatus: "IN_PROGRESS" },
       }),
 
+      // อัปเดตสถานะของอุปกรณ์เป็น "REPAIRING"
+      prisma.equipment.update({
+        where: { id: reportRepair.equipmentId }, // ใช้ equipmentId ที่ดึงมา
+        data: { statusEquipment: "REPAIRING" },
+      }),
+
       // สร้างรายการใหม่ใน assignment
       prisma.assignment.create({
         data: {
@@ -64,12 +72,14 @@ exports.assignRepairJob = async (req, res) => {
       message: "Assigned repair job successfully",
       updatedReportRepair: result[0],
       newAssignment: result[1],
+      updatedEquipment: result[2], // เพิ่มการคืนค่า
     });
   } catch (error) {
     console.log(error);
   }
 };
 
+//ช่างรับงานเอง
 exports.assignJobByTechnician = async (req, res) => {
   try {
     const { reportRepairId } = req.body;
@@ -112,6 +122,12 @@ exports.assignJobByTechnician = async (req, res) => {
         data: { assignmentStatus: "IN_PROGRESS" },
       }),
 
+      // อัปเดตสถานะของอุปกรณ์เป็น "REPAIRING"
+      prisma.equipment.update({
+        where: { id: reportRepair.equipmentId }, // ใช้ equipmentId ที่ดึงมา
+        data: { statusEquipment: "REPAIRING" },
+      }),
+
       // สร้าง assignment โดยใช้ technicianId จาก req.user
       prisma.assignment.create({
         data: {
@@ -126,6 +142,7 @@ exports.assignJobByTechnician = async (req, res) => {
       message: "Job assigned successfully by technician",
       updatedReportRepair: result[0],
       newAssignment: result[1],
+      updatedEquipment: result[2], // เพิ่มการคืนค่า
     });
   } catch (error) {
     console.error(error);
@@ -135,56 +152,245 @@ exports.assignJobByTechnician = async (req, res) => {
   }
 };
 
+//งานที่รับแล้วทั้งหมด
 exports.listAssignment = async (req, res) => {
   try {
-    const assignment = await prisma.assignment.findMany();
-    res.send(assignment)
+    const { query, page = 1, limit = 5 } = req.query;
+    let whereCondition = {};
+    if (query) {
+      whereCondition = {
+        OR: [
+          // ✅ ค้นหาชื่ออุปกรณ์จาก reportRepair.name
+          { reportRepair: { reporterBy: { firstName: { contains: query } } } },
+          { reportRepair: { reporterBy: { lastName: { contains: query } } } },
+          { reportRepair: { equipment: { name: { contains: query } } } },
+          {
+            reportRepair: {
+              equipment: { equipmentNumber: { contains: query } },
+            },
+          },
+          {
+            reportRepair: {
+              equipment: { equipmentCategory: { name: { contains: query } } },
+            },
+          },
+
+          // // ✅ ค้นหาชื่อช่าง
+          { technician: { firstName: { contains: query } } },
+          { technician: { lastName: { contains: query } } },
+
+          // ✅ ค้นหาตามข้อมูลอื่นๆ
+          { reportRepair: { name: { contains: query } } },
+          { reportRepair: { problem: { contains: query } } },
+          { reportRepair: { address: { contains: query } } },
+        ],
+      };
+    }
+    const take = parseInt(limit); // จำนวนที่ต้องการดึง
+    const skip = (parseInt(page) - 1) * take; // คำนวณ offset
+
+    const assignment = await prisma.assignment.findMany({
+      where: whereCondition,
+      include: {
+        reportRepair: {
+          include: {
+            equipment: {
+              include: {
+                equipmentCategory: true,
+              },
+            },
+            reporterBy: true,
+            images: true,
+          },
+        },
+        technician: true,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+      take,
+      skip,
+    });
+    const count = await prisma.assignment.count({ where: whereCondition });
+
+    res.send({
+      assignment,
+      totalAssignmentAll: count,
+      totalPages: Math.ceil(count / take), // จำนวนหน้าทั้งหมด
+      currentPage: parseInt(page),
+    });
   } catch (error) {
     console.log(error);
   }
 };
 
+//งานที่รับแล้ว By Id
 exports.readAssignment = async (req, res) => {
-    try {
-        const { id } = req.params
-        const assignment = await prisma.assignment.findFirst({
-            where: {
-                id: Number(id)
-            }
-        })
-        res.send(assignment)
-    } catch (error) {
-        console.log(error)
+  try {
+    const { id } = req.params;
+    const assignment = await prisma.assignment.findFirst({
+      where: {
+        id: Number(id),
+      },
+      include: {
+        reportRepair: {
+          include: {
+            equipment: {
+              include: {
+                equipmentCategory: true,
+              },
+            },
+            reporterBy: true,
+            images: true,
+          },
+        },
+        technician: true,
+      },
+    });
+    res.send(assignment);
+  } catch (error) {
+    console.log(error);
+  }
+};
+
+//งานที่ช่างแต่ละคนรับ
+exports.listAssignmentByTechnician = async (req, res) => {
+  try {
+    const { id, role } = req.user;
+    const { query, page = 1, limit = 5 } = req.query;
+
+    let whereCondition = {};
+    if (query) {
+      whereCondition = {
+        OR: [
+          // ✅ ค้นหาชื่ออุปกรณ์จาก reportRepair.name
+          { reportRepair: { reporterBy: { firstName: { contains: query } } } },
+          { reportRepair: { reporterBy: { lastName: { contains: query } } } },
+          { reportRepair: { equipment: { name: { contains: query } } } },
+          {
+            reportRepair: {
+              equipment: { equipmentNumber: { contains: query } },
+            },
+          },
+          {
+            reportRepair: {
+              equipment: { equipmentCategory: { name: { contains: query } } },
+            },
+          },
+
+          // // ✅ ค้นหาชื่อช่าง
+          { technician: { firstName: { contains: query } } },
+          { technician: { lastName: { contains: query } } },
+
+          // ✅ ค้นหาตามข้อมูลอื่นๆ
+          { reportRepair: { name: { contains: query } } },
+          { reportRepair: { problem: { contains: query } } },
+          { reportRepair: { address: { contains: query } } },
+        ],
+      };
     }
-}
+    const take = parseInt(limit); // จำนวนที่ต้องการดึง
+    const skip = (parseInt(page) - 1) * take; // คำนวณ offset
 
-exports.listAssignmentByTechnician = async(req,res)=>{
-    try {
-        const { id,role }= req.user
-
-        if(role !== 'TECHNICIAN'){
-            return res.status(404).json({
-                message: 'You are not allowed to list assignments'
-            })
-        }
-
-
-        const assignment = await prisma.assignment.findMany({
-            where: {
-                technicianId : Number(id)
-            }
-        })
-
-        res.send(assignment)
-    } catch (error) {
-        console.log(error)
+    if (role !== "TECHNICIAN") {
+      return res.status(404).json({
+        message: "You are not allowed to list assignments",
+      });
     }
-}
 
-exports.updateAssignment = async(req,res)=>{
-    try {
-        const { id } = req.params
-    } catch (error) {
-        console.log(error)
+    const assignment = await prisma.assignment.findMany({
+      where: {
+        ...whereCondition,
+        technicianId: Number(id),
+      },
+      include: {
+        reportRepair: {
+          include: {
+            equipment: {
+              include: {
+                equipmentCategory: true,
+              },
+            },
+            reporterBy: true,
+            images: true,
+          },
+        },
+        technician: true,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+      take,
+      skip,
+    });
+    const count = await prisma.assignment.count({
+      where: {
+        ...whereCondition,
+        technicianId: Number(id),
+      },
+    });
+
+    res.send({
+      assignment,
+      totalAssign: count,
+      totalPages: Math.ceil(count / take), // จำนวนหน้าทั้งหมด
+      currentPage: parseInt(page),
+    });
+  } catch (error) {
+    console.log(error);
+  }
+};
+
+exports.listAssignableStatuses = async (req, res) => {
+  try {
+    const assignableStatuses = [
+      { id: "COMPLETED", name: "เสร็จสิ้น" },
+      { id: "CANCELLED", name: "ยกเลิก" },
+    ];
+
+    res.json(assignableStatuses);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+exports.changeTechnicianAssignment = async (req, res) => {
+  try {
+    const { technicianId, assignmentId } = req.body;
+    if (!technicianId || !assignmentId) {
+      return res
+        .status(400)
+        .json({ message: "Technician ID and Assigment ID are required" });
     }
-}
+    // ตรวจสอบว่าผู้ใช้นั้นมีบทบาทเป็นช่างหรือไม่
+    const technician = await prisma.user.findUnique({
+      where: { id: Number(technicianId) },
+      select: { role: true },
+    });
+
+    if (!technician || technician.role !== "TECHNICIAN") {
+      return res
+        .status(400)
+        .json({ message: "Assigned user is not a technician" });
+    }
+
+    const assignment = await prisma.assignment.update({
+      where: {
+        id: Number(assignmentId),
+      },
+      data: {
+        technicianId: technicianId,
+      },
+    });
+    res.json({
+      message: "Update Technician Success",
+      assignment,
+    });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({
+      message: "Server Error",
+    });
+  }
+};
