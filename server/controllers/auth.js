@@ -14,7 +14,7 @@ exports.register = async (req, res) => {
       userName,
       password,
       role,
-      picture,
+      pictureId,
     } = req.body;
 
     const user = await prisma.user.findFirst({
@@ -43,13 +43,13 @@ exports.register = async (req, res) => {
 
     // ตรวจสอบว่ามี picture หรือไม่
     let imageId = null;
-    if (picture) {
+    if (pictureId) {
       const image = await prisma.image.create({
         data: {
-          asset_id: picture.asset_id,
-          public_id: picture.public_id,
-          url: picture.url,
-          secure_url: picture.secure_url,
+          asset_id: pictureId.asset_id,
+          public_id: pictureId.public_id,
+          url: pictureId.url,
+          secure_url: pictureId.secure_url,
         },
       });
       imageId = image.id; // เก็บ imageId หากมีรูปภาพ
@@ -61,7 +61,7 @@ exports.register = async (req, res) => {
         lastName: lastName,
         departmentId: departmentId,
         positionId: positionId,
-        tel:tel,
+        tel: tel,
         email: email,
         userName: userName,
         password: hashPassword,
@@ -94,10 +94,15 @@ exports.login = async (req, res) => {
         role: true,
         password: true,
         enabled: true,
-        departmentId: true, // ดึงเฉพาะ departmentId
+        department: true, // ดึงเฉพาะ departmentId
+        picture: {
+          select: {
+            url: true,
+          },
+        },
       },
     });
-    console.log(user)
+    console.log(user);
 
     if (!user || !user.enabled) {
       return res.status(400).json({
@@ -117,9 +122,10 @@ exports.login = async (req, res) => {
       name: user.firstName,
       username: user.userName,
       role: user.role,
-      departmentId: user.departmentId, 
+      department: user.department,
+      picture: user.picture?.url || null,
     };
-
+    // console.log("payload: " , payload);
     jwt.sign(
       payload,
       process.env.SECRET,
@@ -144,17 +150,25 @@ exports.login = async (req, res) => {
 
 exports.currentUser = async (req, res) => {
   try {
-    const { userName } = req.body;
-    console.log(userName);
+    const { username } = req.user;
+    console.log(username);
     const user = await prisma.user.findUnique({
       where: {
-        userName: userName,
+        userName: username,
       },
       select: {
         id: true,
         email: true,
         firstName: true,
         role: true,
+        department: {
+          select: { name: true }, // ดึงเฉพาะชื่อ department
+        },
+        picture: {
+          select: {
+            url: true, // ดึง URL ของรูปภาพ
+          },
+        },
       },
     });
     res.json({ user });
