@@ -26,16 +26,48 @@ exports.createImages = async (req, res) => {
 
 exports.removeImage = async (req, res) => {
   try {
-    const { public_id } = req.body;
-    // console.log(public_id)
-    cloudinary.uploader.destroy(public_id, (result) => {
-      res.send("Remove Image Success");
+    const { public_id, userId } = req.body;
+
+    console.log("REQ BODY", req.body);
+
+    // ✅ เช็คก่อนว่ามี public_id จริงไหม
+    if (!public_id) {
+      return res.status(400).json({ message: "Missing required parameter - public_id" });
+    }
+
+    // 1. ลบจาก Cloudinary
+    const result = await cloudinary.uploader.destroy(public_id);
+    console.log("Cloudinary result:", result);
+
+    // 2. ค้นหารูปจาก public_id
+    const image = await prisma.image.findFirst({
+      where: { public_id },
     });
+
+    console.log("Found image from DB:", image);
+
+    if (image) {
+      // 3. ลบ pictureId จาก user
+      await prisma.user.update({
+        where: { id: userId },
+        data: { pictureId: null },
+      });
+
+      // 4. ลบ image record จาก DB
+      await prisma.image.delete({
+        where: { id: image.id },
+      });
+    }
+
+    res.json({ message: "Remove Image & Update DB success" });
+
   } catch (error) {
-    console.log(error);
-    res.status(500).json({
-      message: "Server Error",
-    });
+    console.log("❌ ERROR in removeImage:", error);
+    res.status(500).json({ message: "Server Error" });
   }
 };
+
+
+
+
 
