@@ -3,59 +3,136 @@ const bcrypt = require("bcryptjs");
 exports.listUser = async (req, res) => {
   try {
     const { role } = req.user; // role จะมาจาก token ที่ decode แล้วใน `authCheck`
+    const { query, page = 1, limit = 5, sortBy = "createdAt", sortOrder = "desc" } = req.query;
+
+    // ✅ กำหนดเฉพาะ field ที่ให้ sort ได้ เพื่อความปลอดภัย
+    const validSortFields = ["firstName", "lastName", "userName", "email", "createdAt"];
+    const orderByCondition = validSortFields.includes(sortBy) ? { [sortBy]: sortOrder } : { createdAt: "desc" };
+    
+    let whereCondition = {};
+
+    if (query) {
+      whereCondition = {
+        OR: [
+          { firstName: { contains: query } },
+          { lastName: { contains: query } },
+          { userName: { contains: query } },
+          { email: { contains: query } },
+        ],
+      };
+    }
+
+    const take = parseInt(limit); // จำนวนที่ต้องการดึง
+    const skip = (parseInt(page) - 1) * take; // คำนวณ offset
+
     let users;
+    let countForAdmin = 0;
+    let countForSupervisor = 0;
+
+
     if (role === "ADMIN") {
       // Admin: ดูรายชื่อผู้ใช้ทั้งหมด
       users = await prisma.user.findMany({
+        where: whereCondition,
         select: {
           id: true,
-          pictureId: true,
+          picture: {
+            select: {
+              url: true, // ดึง URL ของรูปภาพ
+            },
+          },
           firstName: true,
           lastName: true,
           userName: true,
           email: true,
-          department: true,
-          position: true,
+          department: {
+            select: { name: true }, // ดึงเฉพาะชื่อ department
+          },
+          position: {
+            select: { name: true }, // ดึงเฉพาะชื่อ position
+          },
           role: true,
           enabled: true,
-          createdAt:true,
+          createdAt: true,
         },
-        orderBy:{
-          createdAt:"desc"
-        }
+        orderBy: orderByCondition,
+        take, // ✅ ใช้ Prisma pagination
+        skip,
       });
+      // ✅ นับจำนวนทั้งหมดที่ ADMIN สามารถเห็นได้
+      countForAdmin = await prisma.user.count({ where: whereCondition });
     } else if (role === "SUPERVISOR") {
       // Technician Lead: ดูเฉพาะผู้ใช้ที่เป็น "ช่าง"
       users = await prisma.user.findMany({
         where: {
+          ...whereCondition,
           role: { in: ["TECHNICIAN", "SUPERVISOR"] }, // ดึง TECHNICIAN และ SUPERVISOR
         },
         select: {
           id: true,
-          pictureId: true,
+          picture: {
+            select: {
+              url: true, // ดึง URL ของรูปภาพ
+            },
+          },
           firstName: true,
           lastName: true,
-          department: true,
-          position: true,
+          userName: true,
+          email: true,
+          department: { select: { name: true } },
+          position: { select: { name: true } },
           role: true,
           enabled: true,
-          createdAt:true,
+          createdAt: true,
         },
-        orderBy: {
-          createdAt: "desc",
+        orderBy: orderByCondition,
+        take, // ✅ ใช้ Prisma pagination
+        skip,
+      });
+
+      // ✅ นับจำนวนเฉพาะที่ SUPERVISOR สามารถเห็นได้
+      countForSupervisor = await prisma.user.count({
+        where: {
+          ...whereCondition,
+          role: { in: ["TECHNICIAN", "SUPERVISOR"] },
         },
       });
+      console.log("countForSupervisor", countForSupervisor);
+  
     } else {
       return res.status(403).json({
         message: "Access Denied: Unauthorized role",
       });
     }
 
-    const count = await prisma.user.count()
+    const countAdminDb = await prisma.user.count({
+      where: { role: "ADMIN" },
+    });
+    const countSupervisorDb = await prisma.user.count({
+      where: { role: "SUPERVISOR" },
+    });
+    const countTechnicianDb = await prisma.user.count({
+      where: { role: "TECHNICIAN" },
+    });
+    const countUserDb = await prisma.user.count({
+      where: { role: "USER" },
+    });
+    
+
+    // ✅ นับจำนวนผู้ใช้ทั้งหมด
+    // const totalUser = await prisma.user.count({ where: whereCondition });
     res.json({
-      totalUser: count,
-      users
-    })
+      totalUser: role === "ADMIN" ? countForAdmin : countForSupervisor, // นับตามสิทธิ์ที่เห็น
+      users,
+      totalPages: Math.ceil(
+        (role === "ADMIN" ? countForAdmin : countForSupervisor) / take
+      ),
+      currentPage: parseInt(page),
+      countAdminDb,
+      countSupervisorDb,
+      countTechnicianDb,
+      countUserDb
+    });
   } catch (error) {
     console.log(error);
   }
@@ -75,15 +152,35 @@ exports.readUser = async (req, res) => {
         lastName: true,
         userName: true,
         email: true,
-        department: true,
-        position: true,
+        role: true,
+        tel: true,
+        department: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        position: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        picture: {
+          select: {
+            url: true, // ดึง URL ของรูปภาพ
+            public_id: true,
+          },
+        },
+        enabled: true,
+        createdAt: true,
       },
     });
 
-    if(!user) {
+    if (!user) {
       return res.status(404).json({
-        message: "User not foun"
-      })
+        message: "User not foun",
+      });
     }
     res.send(user);
   } catch (error) {
@@ -95,8 +192,16 @@ exports.readUser = async (req, res) => {
 
 exports.updateUser = async (req, res) => {
   try {
-    const { firstName, lastName, departmentId, positionId, tel, email, userName ,pictureId } =
-      req.body;
+    const {
+      firstName,
+      lastName,
+      departmentId,
+      positionId,
+      tel,
+      email,
+      userName,
+      pictureId,
+    } = req.body;
 
     const checkEmailUsername = await prisma.user.findFirst({
       where: {
@@ -120,15 +225,28 @@ exports.updateUser = async (req, res) => {
         checkEmailUsername.email === email &&
         checkEmailUsername.userName === userName
       ) {
-        message = "Email and Username already exist.";
+        message = "Email และ Username นี้มีผู้ใช้แล้ว.";
       } else if (checkEmailUsername.email === email) {
-        message = "Email already exists.";
+        message = "Email นี้มีผู้ใช้แล้ว.";
       } else if (checkEmailUsername.userName === userName) {
-        message = "Username already exists.";
+        message = "Username นี้มีผู้ใช้แล้ว.";
       }
       return res.status(400).json({
         message: message,
       });
+    }
+
+    let imageId = req.checkUser.pictureId; // ค่าดั้งเดิม
+    if (pictureId) {
+      const image = await prisma.image.create({
+        data: {
+          asset_id: pictureId.asset_id,
+          public_id: pictureId.public_id,
+          url: pictureId.url,
+          secure_url: pictureId.secure_url,
+        },
+      });
+      imageId = image.id; // ใช้ imageId ใหม่
     }
 
     const user = await prisma.user.update({
@@ -140,10 +258,10 @@ exports.updateUser = async (req, res) => {
         lastName: lastName,
         departmentId: departmentId,
         positionId: positionId,
-        tel:tel,
+        tel: tel,
         email: email,
         userName: userName,
-        pictureId: pictureId
+        pictureId: imageId,
       },
     });
 
@@ -181,11 +299,11 @@ exports.changeStatusUser = async (req, res) => {
 
 exports.changeRole = async (req, res) => {
   try {
-    const { role } = req.body;
+    const { id, role } = req.body;
 
     await prisma.user.update({
       where: {
-        id:  req.checkUser.id,
+        id: Number(id),
       },
       data: {
         role: role,
@@ -213,5 +331,22 @@ exports.changePassword = async (req, res) => {
     res.json({ message: "Password changed successfully" });
   } catch (error) {
     console.log(error);
+  }
+};
+
+exports.listSupervisorandTechnician = async (req, res) => {
+  try {
+    const users = await prisma.user.findMany({
+      where: {
+        role: {
+          in: ["TECHNICIAN"], // ดึง role ที่อยู่ใน array
+        },
+      },
+    });
+
+    res.json(users); // ส่งข้อมูลกลับไปที่ client
+  } catch (error) {
+    console.error("Error fetching users:", error);
+    res.status(500).json({ message: "Internal Server Error" });
   }
 };
